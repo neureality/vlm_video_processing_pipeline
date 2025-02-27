@@ -1,0 +1,24 @@
+{
+    "video_decoder": {
+        "input_path": "/home/ubuntu/work/demo_data/SampleVideo_1280x720_2mb.mp4",
+        "input_resolution": [ 720, 1280],
+        "dimension_order": "NHWC",
+        "codec": "h264",
+        "num_output_frames": 10,
+        "device": "cpu",
+        "save_output": true
+    },
+    "crop_maker": {
+        "num_crops": 2,
+        "global": {
+            "resize": [ 336, 602]
+        },
+        "refine": {
+            "resize": [ 476, 840]
+        },
+        "crop": {
+            "best_grid": [ 1, 2]
+        },
+        "save_output": true
+    }
+}
