@@ -11,16 +11,12 @@ with open("config.json", "r") as f:
 logger.info("Starting video processing pipeline...")
 
 # Build the pipeline dynamically using the config file
-pipeline = DecodeAndSample(config["video_decoder"], 
-                           next_processor=CropMaker(config["crop_maker"],
-                                                    next_processor=None
-                                                    )
-    # ResizeVideo(config["resize_video"],    # Step 3
-    # CropGenerator(config["crop_generator"])
-    # )
-    # )
+pipeline = (
+    DecodeAndSample(config["video_decoder"], next_processor= \
+    CropMaker(config["crop_maker"], next_processor= \
+    None),
+    )
 )
-
 # Run the pipeline
 processed_frames = pipeline.process()
-logger.info(f"Final output: {len(processed_frames)} frames processed") # Temporary
+logger.info(f"Final output: {len(processed_frames)} frames processed")  # Temporary
