@@ -8,7 +8,7 @@
         "device": "cpu",
         "save_output": true
     },
-    "crop_maker": {
+    "video_preprocessing": {
         "num_crops": 2,
         "global": {
             "resize": [ 336, 602]

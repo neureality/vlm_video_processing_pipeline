@@ -7,7 +7,7 @@ from .base_pipeline_op import BasePipelineOp
 from logger import logger
 
 
-class CropMaker(BasePipelineOp):
+class VideoPreprocessing(BasePipelineOp):
     def __init__(self, config, next_processor=None):
         super().__init__(config, next_processor)
         self.is_save_output = config["save_output"]
