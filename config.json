@@ -10,15 +10,12 @@
     },
     "video_preprocessing": {
         "num_crops": 2,
-        "global": {
-            "resize": [ 336, 602]
-        },
-        "refine": {
-            "resize": [ 476, 840]
-        },
-        "crop": {
-            "best_grid": [ 1, 2]
-        },
+        "resize_global": [ 336, 602],
+        "resize_refine": [ 476, 840],
+        "crop_best_grid": [ 1, 2],
+        "mean": [0.5, 0.5, 0.5],
+        "std": [0.5, 0.5, 0.5],
+        "patch_size": 14,
         "save_output": true
     }
 }
