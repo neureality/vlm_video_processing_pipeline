@@ -1,20 +1,22 @@
 # Video Processing Pipeline
 
-A modular video processing pipeline designed for the VLM (MiniCPM-V) project. This pipeline efficiently decodes videos and prepares frame data for downstream vision language models.
+A modular video processing pipeline designed for Vision Language Models (particularly MiniCPM-V) that efficiently decodes videos and prepares frame data through a multi-stage transformation process optimized for ViT (Siglip) inference.
 
 ## Overview
 
-This pipeline provides a flexible framework for processing video data through a series of operations:
+This pipeline provides a flexible framework for processing video data through a series of specialized operations:
 
-1. **Video Decoding and Sampling**: Extracts frames from videos at specified intervals
-2. **Crop Generation**: Resizes frames and generates strategic crops for detailed analysis
+1. **Video Decoding and Sampling**: Extracts frames from videos at uniform intervals
+2. **Video Preprocessing**: Performs spatial transformations including resizing and strategic cropping
+3. **VFM Preprocessing**: Prepares the processed frames for the ViT (Siglip) by handling patching, padding, and attention masks
 
-The architecture follows a modular design pattern where each processing step can be chained together to form a complete pipeline.
+The architecture follows a modular design pattern where each processing step is implemented as a separate component that can be chained together to form a complete pipeline. Each stage transforms the data into a format required by the next stage, ultimately producing ViT (Siglip)-Ready tensors.
 
 ## Requirements
 
 - Python 3.8+
 - PyTorch
+- torchvision
 - torchcodec
 - NumPy
 - Pillow
@@ -40,17 +42,24 @@ The pipeline is configured through a JSON file (`config.json`) with the followin
         "device": "cpu",
         "save_output": true
     },
-    "crop_maker": {
+    "video_preprocessing": {
         "num_crops": 2,
-        "global": {
-            "resize": [336, 602]
-        },
-        "refine": {
-            "resize": [476, 840]
-        },
-        "crop": {
-            "best_grid": [1, 2]
-        },
+        "resize_global": [336, 602],
+        "resize_refine": [476, 840],
+        "crop_best_grid": [1, 2],
+        "mean": [0.5, 0.5, 0.5],
+        "std": [0.5, 0.5, 0.5],
+        "patch_size": 14,
+        "device": "cpu",
+        "save_output": true
+    },
+    "vfm_preprocessing": {
+        "dtype": "bfloat16",
+        "batch_size": 30,
+        "patch_size": 14,
+        "num_patches_in_global_slice": 1032,
+        "num_patches_in_crop_slice": 1020,
+        "device": "cpu",
         "save_output": true
     }
 }
@@ -58,7 +67,7 @@ The pipeline is configured through a JSON file (`config.json`) with the followin
 
 ### Configuration Parameters
 
-#### Video Decoder
+#### Video Decoder (`video_decoder`)
 - `input_path`: Path to the input video file
 - `input_resolution`: Expected resolution of the input video [height, width]
 - `dimension_order`: Tensor dimension order (NHWC or NCHW)
@@ -67,11 +76,24 @@ The pipeline is configured through a JSON file (`config.json`) with the followin
 - `device`: Processing device (cpu or cuda)
 - `save_output`: Whether to save intermediate outputs
 
-#### Crop Maker
+#### Video Preprocessing (`video_preprocessing`)
 - `num_crops`: Number of crops to generate
-- `global.resize`: Dimensions for global resize [height, width]
-- `refine.resize`: Dimensions for refined crops [height, width]
-- `crop.best_grid`: Grid division for cropping [rows, columns]
+- `resize_global`: Dimensions for global resize [height, width]
+- `resize_refine`: Dimensions for refined crops [height, width]
+- `crop_best_grid`: Grid division for cropping [rows, columns]
+- `mean`: Mean values for normalization [R, G, B]
+- `std`: Standard deviation values for normalization [R, G, B]
+- `patch_size`: Size of patches for VLM processing (typically 14 or 16)
+- `device`: Processing device (cpu or cuda)
+- `save_output`: Whether to save intermediate outputs
+
+#### VFM Preprocessing (`vfm_preprocessing`)
+- `dtype`: Data type for output tensors (e.g., bfloat16)
+- `batch_size`: Batch size for processing
+- `patch_size`: Size of image patches (should match the video_preprocessing patch_size)
+- `num_patches_in_global_slice`: Number of patches in the global slice
+- `num_patches_in_crop_slice`: Number of patches in each crop slice
+- `device`: Processing device (cpu or cuda)
 - `save_output`: Whether to save intermediate outputs
 
 ## Usage
@@ -84,8 +106,15 @@ python main.py
 
 The pipeline will:
 1. Decode the video and sample frames at regular intervals
-2. Generate a global resized view of each frame
-3. Create additional crops of areas of interest
+2. Process the frames through video preprocessing:
+   - Generate a global resized view of each frame
+   - Create additional two crops (vertical slicing)
+   - Normalize pixel values
+   - Reshape frames into patches
+3. Process the frames through VFM preprocessing:
+   - Convert to specified data type
+   - Prepare attention masks
+   - Format tensors for ViT (Siglip) inference
 4. Save outputs to the `outputs/` directory (if configured)
 
 ## Pipeline Architecture
@@ -93,23 +122,23 @@ The pipeline will:
 The pipeline follows a modular design with a processing chain:
 
 - `BasePipelineOp`: Abstract base class that defines the interface for all pipeline operations
-- `DecodeAndSample`: Decodes video and extracts frames
-- `CropMaker`: Resizes frames and creates crops
+- `DecodeAndSample`: Decodes video and extracts frames at uniform intervals
+- `VideoPreprocessing`: Performs spatial transformations on frames
+- `VFMPreprocessing`: Prepares processed frames for ViT (Siglip) inference
 
-Each processor can be configured independently and chained together using the `next_processor` parameter.
+Each processor can be configured independently and chained together using the `next_processor` parameter. The pipeline uses a sequential execution model where the output of one processor becomes the input to the next.
 
 ## Output
 
-Processed frames are saved as PyTorch tensors in pickle format in the `outputs/` directory:
+Processed data is saved as PyTorch tensors in pickle format in the `outputs/` directory:
 
 - `decoder_output.pkl`: Raw decoded frames
-- `crop_maker_output.pkl`: Resized and cropped frames
+- `pixel_values.pkl`: Processed image patches
+- `tgt_sizes.pkl`: Target sizes for each processed image patch
+- `image_sizes.pkl`: Original image sizes
+- `all_pixel_values.pkl`: Padded pixel values
+- `patch_attn_mask.pkl`: Attention masks for patches
 
-## Development
+## Logging
 
-To extend the pipeline with new operations:
-
-1. Create a new class that inherits from `BasePipelineOp`
-2. Implement the `process()` and `save_output()` methods
-3. Update the configuration file to include settings for your new processor
-4. Chain it into the pipeline in `main.py`
+The pipeline uses Python's built-in logging module to provide information about the processing steps. You can adjust the logging level in `logger.py` to get more or less detailed information.
