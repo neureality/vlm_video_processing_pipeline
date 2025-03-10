@@ -1,4 +1,4 @@
-# video_pipeline/resize_video.py
+# video_pipeline/video_preprocessing.py
 from logger import logger
 from .base_pipeline_op import BasePipelineOp
 import os
@@ -13,7 +13,13 @@ from torchvision.transforms.functional import normalize
 class VideoPreprocessing(BasePipelineOp):
     def __init__(self, config, next_processor=None):
         super().__init__(config, next_processor)
-        self.is_save_output = config["save_output"]
+        self.device = config["device"]
+        self.resize_global = config["resize_global"]
+        self.resize_refine = config["resize_refine"]
+        self.crop_best_grid = config["crop_best_grid"]
+        self.patch_size = config["patch_size"]
+        self.mean = config["mean"]
+        self.std = config["std"]
 
     def process(self, _frames: List[torch.Tensor]) -> List[torch.Tensor]:
         """Process the video frames
@@ -32,9 +38,10 @@ class VideoPreprocessing(BasePipelineOp):
         new_images = []
         tgt_sizes = []
         for frame in _frames:
+            frame = frame.to(self.device) # Move the frame to the device
             # 1. First patch - resized image
             slice_images.append(
-                self.resize_torch_image(frame, self.config["resize_global"])
+                self.resize_torch_image(frame, self.resize_global)
             )
             # 2. Get two patches from the image
             patches: list = self._get_patches(frame)
@@ -49,8 +56,10 @@ class VideoPreprocessing(BasePipelineOp):
         # 4. Normalize the image
         slice_images = [
             normalize(
-                img, mean=self.config["mean"], std=self.config["std"]
-            )  # Gets (C, H, W)
+                img,
+                mean=self.mean,
+                std=self.std,
+            )  # Normalize accepts tensors of shape (C, H, W)
             for img in slice_images
         ]
 
@@ -59,27 +68,30 @@ class VideoPreprocessing(BasePipelineOp):
             new_images.append(self.reshape_by_patch(slice_image))
             tgt_sizes.append(
                 (
-                    slice_image.shape[1] // self.config["patch_size"],
-                    slice_image.shape[2] // self.config["patch_size"],
+                    slice_image.shape[1] // self.patch_size,
+                    slice_image.shape[2] // self.patch_size,
                 )
             )
-        tgt_sizes = torch.tensor(tgt_sizes)
+        tgt_sizes = torch.tensor(tgt_sizes, device=self.device)
+        
+        # Save the output
         self.save_output(new_images, "pixel_values") if self.is_save_output else None  # Save output
         self.save_output(tgt_sizes, "tgt_sizes") if self.is_save_output else None  # Save output
         self.save_output(image_sizes, "image_sizes") if self.is_save_output else None  # Save output
         
-        return (
-            self.next_processor.process({"pixel_values": new_images, "tgt_sizes": tgt_sizes, "image_sizes": image_sizes})
-            if self.next_processor
-            else {"pixel_values": new_images, "tgt_sizes": tgt_sizes, "image_sizes": image_sizes}
-        )
+        returned_dict = {
+            "pixel_values": new_images,
+            "tgt_sizes": tgt_sizes,
+            "image_sizes": image_sizes,
+        }
+        return self.next_processor.process(returned_dict) if self.next_processor else returned_dict
 
     def _get_patches(self, frame: torch.Tensor) -> torch.Tensor:
         """Get patches from the image"""
         # 1. Resize the image to refined size
-        refined_frame = self.resize_torch_image(frame, self.config["resize_refine"])
+        refined_frame = self.resize_torch_image(frame, self.resize_refine)
         # 2. Slice the image into patches
-        return self.split_into_patches(refined_frame, self.config["crop_best_grid"])
+        return self.split_into_patches(refined_frame, self.crop_best_grid)
 
     def split_into_patches(self, image, grid):
         patches = []
@@ -126,7 +138,7 @@ class VideoPreprocessing(BasePipelineOp):
         :param patch_size:
         :return: [3, patch_size, HW/patch_size]
         """
-        patch_size = self.config["patch_size"]
+        patch_size = self.patch_size
         patches = F.unfold(
             image, (patch_size, patch_size), stride=(patch_size, patch_size)
         )

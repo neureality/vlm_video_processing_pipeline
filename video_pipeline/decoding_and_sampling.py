@@ -10,20 +10,24 @@ class DecodeAndSample(BasePipelineOp):
     def __init__(self, config, next_processor=None):
         super().__init__(config, next_processor)
         self.num_output_frames = config["num_output_frames"]
-        self.is_save_output = config["save_output"]
+        self.input_path = config["input_path"]
+        self.device = config["device"]
+        self.dim_order = config["dimension_order"]
+        self.input_resolution = config["input_resolution"]
+        self.codec = config["codec"]
+
+        # TODO: Maybe this should be in the process (accepts each time new video)
         self.decoder = VideoDecoder(
-            source=config["input_path"],
-            device=config["device"],
-            dimension_order=config["dimension_order"],
+            source=self.input_path,
+            device=self.device,
+            dimension_order=self.dim_order,
         )
         assert (
-            self.decoder.metadata.height == config["input_resolution"][0]
+            self.decoder.metadata.height == self.input_resolution[0]
         ), "Height mismatch"
-        assert (
-            self.decoder.metadata.width == config["input_resolution"][1]
-        ), "Width mismatch"
-        assert self.decoder.metadata.codec == config["codec"], "Codec mismatch"
-        logger.info(f"Decoding video from {config['input_path']}")
+        assert self.decoder.metadata.width == self.input_resolution[1], "Width mismatch"
+        assert self.decoder.metadata.codec == self.codec, "Codec mismatch"
+        logger.info(f"Decoding video from {self.input_path}")
         logger.info(f"Video metadata: {self.decoder.metadata}")
 
     def process(self):
@@ -42,16 +46,12 @@ class DecodeAndSample(BasePipelineOp):
 
         tensor_frames = self.decoder.get_frames_at(indices=frame_idx).data
         self.save_output(tensor_frames) if self.is_save_output else None  # Save output
-        return (
-            self.next_processor.process(tensor_frames)
-            if self.next_processor
-            else tensor_frames
-        )
+        return self.next_processor.process(tensor_frames) if self.next_processor else tensor_frames
 
     @staticmethod
     def save_output(object):
         """Saves the output to a pickel."""
         # Create output directory if it doesn't exist
-        os.makedirs('outputs', exist_ok=True)
+        os.makedirs("outputs", exist_ok=True)
         torch.save(object, "outputs/decoder_output.pkl")
         logger.info(f"decoder output saved to decoder_output.pkl")

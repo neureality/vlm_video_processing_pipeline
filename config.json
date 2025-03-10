@@ -16,6 +16,16 @@
         "mean": [0.5, 0.5, 0.5],
         "std": [0.5, 0.5, 0.5],
         "patch_size": 14,
+        "device": "cpu",
+        "save_output": true
+    },
+    "vfm_preprocessing": {
+        "dtype": "bfloat16",
+        "batch_size": 30,
+        "patch_size": 14,
+        "num_patches_in_global_slice": 1032,
+        "num_patches_in_crop_slice": 1020,
+        "device": "cpu",
         "save_output": true
     }
 }

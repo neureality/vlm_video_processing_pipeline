@@ -6,6 +6,7 @@ class BasePipelineOp(ABC):
     def __init__(self, config, next_processor=None):
         self.config = config
         self.next_processor = next_processor  # Links to the next step
+        self.is_save_output = config["save_output"]
         self.name = self.__class__.__name__
 
     @abstractmethod
