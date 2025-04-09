@@ -1,11 +1,11 @@
 {
     "video_decoder": {
-        "input_path": "/home/ubuntu/work/demo_data/SampleVideo_1280x720_2mb.mp4",
+        "input_path": "/home/odedh/videos/SampleVideo_1280x720_2mb.mp4",
         "input_resolution": [ 720, 1280],
         "dimension_order": "NHWC",
         "codec": "h264",
         "num_output_frames": 10,
-        "device": "cpu",
+        "device": "cuda",
         "save_output": true
     },
     "video_preprocessing": {
