@@ -31,13 +31,14 @@ class VideoPreprocessing(BasePipelineOp):
             Dict[str, torch.Tensor]: Dictionary containing the processed video frames
         """
         
-        logger.info("Resizing and Cropping the images")
+        # logger.info("Resizing and Cropping the images")
 
         image_sizes = [(image.shape[0], image.shape[1]) for image in _frames]
         slice_images = []
         new_images = []
         tgt_sizes = []
         for frame in _frames:
+            frame = frame.to(dtype=torch.float32) / 255.0 # NOTICE: torch.uint8 (aka Byte) tensors are not supported by F.interpolate() on the GPU (CUDA).
             frame = frame.to(self.device) # Move the frame to the device
             # 1. First patch - resized image
             slice_images.append(
@@ -75,9 +76,10 @@ class VideoPreprocessing(BasePipelineOp):
         tgt_sizes = torch.tensor(tgt_sizes, device=self.device)
         
         # Save the output
-        self.save_output(new_images, "pixel_values") if self.is_save_output else None  # Save output
-        self.save_output(tgt_sizes, "tgt_sizes") if self.is_save_output else None  # Save output
-        self.save_output(image_sizes, "image_sizes") if self.is_save_output else None  # Save output
+        # dont save so we wont waste time on it in performance tests
+        # self.save_output(new_images, "pixel_values") if self.is_save_output else None  # Save output
+        # self.save_output(tgt_sizes, "tgt_sizes") if self.is_save_output else None  # Save output
+        # self.save_output(image_sizes, "image_sizes") if self.is_save_output else None  # Save output
         
         returned_dict = {
             "pixel_values": new_images,
@@ -120,7 +122,9 @@ class VideoPreprocessing(BasePipelineOp):
         # Ensure input is a 4D tensor (batch dimension)
         if frame.dim() == 3:
             frame = frame.unsqueeze(0)
-
+        # logger.info(f"frams dtype is:{frame.dtype}")
+        # logger.info(f"frams dtype is:{frame.dtype}")
+        
         # Perform resizing using bicubic interpolation
         resized = F.interpolate(
             frame, size=tuple(size), mode="bicubic", align_corners=False

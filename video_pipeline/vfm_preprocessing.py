@@ -14,10 +14,21 @@ class VFMPreprocessing(BasePipelineOp):
         self.num_patches_in_global_slice = config["num_patches_in_global_slice"] # Default: 1032 = (336/14)*(602/14)
         self.num_patches_in_crop_slice = config["num_patches_in_crop_slice"] # Default: 1020 = (476/14)*(840/2/14)  
 
-    def process(self, data: dict[str, torch.Tensor]):
+    # def process(self, data: dict[str, torch.Tensor]):
+    #     # Based on https://huggingface.co/openbmb/MiniCPM-V-2_6/blob/main/modeling_minicpmv.py#L78
+    #     pixel_values = data["pixel_values"]
+    #     tgt_sizes = data["tgt_sizes"]
+        
+    
+    def process(self, pixel_values: torch.Tensor, tgt_sizes: torch.Tensor):
         # Based on https://huggingface.co/openbmb/MiniCPM-V-2_6/blob/main/modeling_minicpmv.py#L78
-        pixel_values = data["pixel_values"]
-        tgt_sizes = data["tgt_sizes"]
+        # pixel_values = data["pixel_values"]
+        # tgt_sizes = data["tgt_sizes"]
+        # logger.info(f"pixel_values: {len(pixel_values)}")
+        # logger.info(f"pixel_values: {len(pixel_values)}")
+        
+        # logger.info(f"tgt_sizes: {len(tgt_sizes)}")
+        # logger.info(f"tgt_sizes: {len(tgt_sizes)}")
 
         device = self.device
         dtype = self.dtype
@@ -44,9 +55,10 @@ class VFMPreprocessing(BasePipelineOp):
             
             
         # Save the output
-        self.save_output(all_pixel_values, "all_pixel_values") if self.is_save_output else None  # Save output
-        self.save_output(patch_attn_mask, "patch_attn_mask") if self.is_save_output else None  # Save output
-        self.save_output(tgt_sizes, "tgt_sizes") if self.is_save_output else None  # Save output
+        # dont save so we wont waste time on it in performance tests
+        # self.save_output(all_pixel_values, "all_pixel_values") if self.is_save_output else None  # Save output
+        # self.save_output(patch_attn_mask, "patch_attn_mask") if self.is_save_output else None  # Save output
+        # self.save_output(tgt_sizes, "tgt_sizes") if self.is_save_output else None  # Save output
         returned_dict = {
             "all_pixel_values": all_pixel_values.type(getattr(torch, dtype)),
             "patch_attn_mask": patch_attn_mask,

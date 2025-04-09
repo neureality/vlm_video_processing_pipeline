@@ -16,6 +16,7 @@ class DecodeAndSample(BasePipelineOp):
         self.input_resolution = config["input_resolution"]
         self.codec = config["codec"]
 
+        print("self.device: ", self.device)
         # TODO: Maybe this should be in the process (accepts each time new video)
         self.decoder = VideoDecoder(
             source=self.input_path,

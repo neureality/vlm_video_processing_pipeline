@@ -6,7 +6,8 @@ from video_pipeline.vfm_preprocessing import VFMPreprocessing
 from logger import logger
 
 # Load configuration
-with open("config.json", "r") as f:
+# with open("config.json", "r") as f:
+with open("/home/ronliv/ws/nr_value_prop/submodules/preprocessing/config.json", "r") as f: # TODO change
     config = json.load(f)
 
 logger.info("Starting video processing pipeline...")
