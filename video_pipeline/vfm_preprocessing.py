@@ -3,7 +3,7 @@ from logger import logger
 from .base_pipeline_op import BasePipelineOp
 import os
 import torch
-
+# import nvtx
 class VFMPreprocessing(BasePipelineOp):
     def __init__(self, config, next_processor=None):
         super().__init__(config, next_processor)
@@ -14,6 +14,7 @@ class VFMPreprocessing(BasePipelineOp):
         self.num_patches_in_global_slice = config["num_patches_in_global_slice"] # Default: 1032 = (336/14)*(602/14)
         self.num_patches_in_crop_slice = config["num_patches_in_crop_slice"] # Default: 1020 = (476/14)*(840/2/14)  
 
+    # @nvtx.annotate("process [VFMPreprocessing]", color="blue")
     def process(self, data: dict[str, torch.Tensor]):
         # Based on https://huggingface.co/openbmb/MiniCPM-V-2_6/blob/main/modeling_minicpmv.py#L78
         pixel_values = data["pixel_values"]

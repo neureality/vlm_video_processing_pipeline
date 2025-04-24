@@ -7,8 +7,7 @@ from typing import List
 import torch
 import torch.nn.functional as F
 from torchvision.transforms.functional import normalize
-
-
+# import nvtx
 
 class VideoPreprocessing(BasePipelineOp):
     def __init__(self, config, next_processor=None):
@@ -21,6 +20,7 @@ class VideoPreprocessing(BasePipelineOp):
         self.mean = config["mean"]
         self.std = config["std"]
 
+    # @nvtx.annotate("process [VideoPreprocessing]", color="blue")
     def process(self, _frames: List[torch.Tensor]) -> List[torch.Tensor]:
         """Process the video frames
         
@@ -30,15 +30,12 @@ class VideoPreprocessing(BasePipelineOp):
         Returns:
             Dict[str, torch.Tensor]: Dictionary containing the processed video frames
         """
-        
-        logger.info("Resizing and Cropping the images")
-
         image_sizes = [(image.shape[0], image.shape[1]) for image in _frames]
+        _frames = [frame.to(self.device) for frame in _frames]
         slice_images = []
         new_images = []
         tgt_sizes = []
         for frame in _frames:
-            frame = frame.to(self.device) # Move the frame to the device
             # 1. First patch - resized image
             slice_images.append(
                 self.resize_torch_image(frame, self.resize_global)
@@ -86,6 +83,7 @@ class VideoPreprocessing(BasePipelineOp):
         }
         return self.next_processor.process(returned_dict) if self.next_processor else returned_dict
 
+    # @nvtx.annotate("_get_patches [VideoPreprocessing]", color="green")
     def _get_patches(self, frame: torch.Tensor) -> torch.Tensor:
         """Get patches from the image"""
         # 1. Resize the image to refined size
@@ -93,20 +91,25 @@ class VideoPreprocessing(BasePipelineOp):
         # 2. Slice the image into patches
         return self.split_into_patches(refined_frame, self.crop_best_grid)
 
+    # @nvtx.annotate("split_into_patches [VideoPreprocessing]", color="green")
     def split_into_patches(self, image, grid):
-        patches = []
-        height, width, C = image.shape  # image: (H, W, C)
-        patch_width = width // grid[1]
+        """Vectorized version of splitting an image into patches"""
+        height, width, C = image.shape
         patch_height = height // grid[0]
-
-        for i in range(0, height, patch_height):
-            for j in range(0, width, patch_width):
-                # Slice the tensor: now height is axis 0, width is axis 1, and channels is axis 2
-                patch = image[i : i + patch_height, j : j + patch_width, :]
-                patches.append(patch)
-
+        patch_width = width // grid[1]
+        
+        # Pre-allocate all patches at once
+        patches = []
+        
+        # Use torch.chunk for more efficient slicing
+        h_chunks = torch.chunk(image, grid[0], dim=0)
+        for h_chunk in h_chunks:
+            w_chunks = torch.chunk(h_chunk, grid[1], dim=1)
+            patches.extend(w_chunks)
+            
         return patches
 
+    # @nvtx.annotate("resize_torch_image [VideoPreprocessing]", color="green")
     def resize_torch_image(
         self, frame: torch.Tensor, size: tuple | list
     ) -> torch.Tensor:
@@ -121,10 +124,15 @@ class VideoPreprocessing(BasePipelineOp):
         if frame.dim() == 3:
             frame = frame.unsqueeze(0)
 
+        # # Convert to float32 for interpolation if necessary
+        if frame.dtype == torch.uint8:
+            frame = frame.float()
+            
         # Perform resizing using bicubic interpolation
         resized = F.interpolate(
             frame, size=tuple(size), mode="bicubic", align_corners=False
         )
+        resized = resized.clamp(0, 255).to(torch.uint8)
         resized = resized.squeeze(0)  # Remove batch dimension
 
         if need_permute_back:
@@ -132,6 +140,7 @@ class VideoPreprocessing(BasePipelineOp):
 
         return resized
 
+    # @nvtx.annotate("reshape_by_patch [VideoPreprocessing]", color="green")
     def reshape_by_patch(self, image):
         """
         :param image: shape [3, H, W]
@@ -151,5 +160,6 @@ class VideoPreprocessing(BasePipelineOp):
     def save_output(object, name):
         """Saves the output to a pickel"""
         # Create output directory if it doesn't exist
+        logger.info(f"Saving {name} to outputs/{name}.pkl")
         os.makedirs("outputs", exist_ok=True)
         torch.save(object, f"outputs/{name}.pkl")
