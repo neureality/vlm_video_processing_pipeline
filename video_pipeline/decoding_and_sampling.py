@@ -77,11 +77,11 @@ class DecodeAndSample(BasePipelineOp):
             height=height,
         )
         frame_count = 0
-
+        fps = round(torchcodec.decoders._core.get_container_metadata(decoder=decoder).streams[0].average_fps)
         while True:
             try:
                 frame, *_ = torchcodec.decoders._core.get_next_frame(decoder)
-                frames.append(frame)
+                frames.append(frame) if frame_count % fps == 0 else None
                 frame_count += 1
             except Exception as e:
                 break
@@ -91,8 +91,8 @@ class DecodeAndSample(BasePipelineOp):
             idxs = [int(i * gap + gap / 2) for i in range(n)]
             return idxs
 
-        if frame_count > self.num_output_frames:
-            frame_idx = uniform_sample(frame_count, self.num_output_frames)
+        if len(frames) > self.num_output_frames:
+            frame_idx = uniform_sample(len(frames), self.num_output_frames)
 
         return torch.stack([frames[i] for i in frame_idx]).permute(0, 2, 3, 1)
 
