@@ -1,6 +1,6 @@
 {
     "video_decoder": {
-        "input_path": "/workspace/videos/SampleVideo_1280x720_50frames.mp4",
+        "input_path": "/dev/shm/SampleVideo_1280x720_1800frames.mp4",
         "input_resolution": [ 720, 1280],
         "dimension_order": "NHWC",
         "codec": "h264",

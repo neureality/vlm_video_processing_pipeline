@@ -77,7 +77,8 @@ class DecodeAndSample(BasePipelineOp):
             height=height,
         )
         frame_count = 0
-        fps = round(torchcodec.decoders._core.get_container_metadata(decoder=decoder).streams[0].average_fps)
+        fps = round(torchcodec.decoders._core.get_container_metadata(
+            decoder=decoder).streams[0].average_fps)
         while True:
             try:
                 frame, *_ = torchcodec.decoders._core.get_next_frame(decoder)
