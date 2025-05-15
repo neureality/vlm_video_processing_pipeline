@@ -1,11 +1,11 @@
 {
     "video_decoder": {
-        "input_path": "/dev/shm/SampleVideo_1280x720_1800frames.mp4",
+        "input_path": "/home/odedh/nr_value_prop/videos/SampleVideo_1280x720_300frames.mp4",
         "input_resolution": [ 720, 1280],
         "dimension_order": "NHWC",
         "codec": "h264",
         "num_output_frames": 10,
-        "device": "cuda",
+        "device": "cpu",
         "save_output": false
     },
     "video_preprocessing": {
@@ -17,7 +17,7 @@
         "std": [0.5, 0.5, 0.5],
         "patch_size": 14,
         "batch_size": 10,
-        "device": "cuda",
+        "device": "cpu",
         "save_output": false
     },
     "vfm_preprocessing": {
@@ -26,7 +26,7 @@
         "patch_size": 14,
         "num_patches_in_global_slice": 1032,
         "num_patches_in_crop_slice": 1020,
-        "device": "cuda",
+        "device": "cpu",
         "save_output": false
     }
 }
