@@ -19,6 +19,8 @@ class VideoPreprocessing(BasePipelineOp):
         self.patch_size = config["patch_size"]
         self.mean = config["mean"]
         self.std = config["std"]
+        self.num_patches_in_global_slice = config["num_patches_in_global_slice"]
+        self.num_patches_in_crop_slice = config["num_patches_in_crop_slice"]
 
     # @nvtx.annotate("process [VideoPreprocessing]", color="blue")
     def process(self, _frames: List[torch.Tensor]) -> List[torch.Tensor]:
@@ -62,7 +64,10 @@ class VideoPreprocessing(BasePipelineOp):
 
         # 5. Reshape the image by patch
         for slice_image in slice_images:
-            new_images.append(self.reshape_by_patch(slice_image))
+            reshaped_image = self.reshape_by_patch(slice_image)
+            pad_size = self.patch_size * self.num_patches_in_global_slice
+            padded_tensor = F.pad(reshaped_image, (0, pad_size - reshaped_image.shape[2], 0, 0, 0, 0), "constant", 0)
+            new_images.append(padded_tensor)
             tgt_sizes.append(
                 (
                     slice_image.shape[1] // self.patch_size,

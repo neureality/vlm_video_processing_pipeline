@@ -17,6 +17,8 @@
         "std": [0.5, 0.5, 0.5],
         "patch_size": 14,
         "batch_size": 10,
+        "num_patches_in_global_slice": 1032,
+        "num_patches_in_crop_slice": 1020,
         "device": "cpu",
         "save_output": false
     },
@@ -27,6 +29,6 @@
         "num_patches_in_global_slice": 1032,
         "num_patches_in_crop_slice": 1020,
         "device": "cpu",
-        "save_output": false
+        "save_output": true
     }
 }

@@ -32,8 +32,7 @@ class VFMPreprocessing(BasePipelineOp):
         ]
 
         # 2 
-        all_pixel_values = torch.nn.utils.rnn.pad_sequence(
-            all_pixel_values_lst, batch_first=True, padding_value=0.0)
+        all_pixel_values = torch.stack(all_pixel_values_lst)  # [30, HW/patch_size + padding (for smaller patches), 3 * patch_size]
         
         # 3
         all_pixel_values = all_pixel_values.permute(0, 2, 1).reshape(B, 3, -1, L)
