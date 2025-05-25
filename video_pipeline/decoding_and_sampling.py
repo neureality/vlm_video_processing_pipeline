@@ -1,5 +1,6 @@
 # video_decoder/decoding_and_sampling.py
 import os
+import numpy as np
 import torch
 from torchcodec.decoders import VideoDecoder
 import torchcodec
@@ -92,7 +93,7 @@ class DecodeAndSample(BasePipelineOp):
             idxs = [int(i * gap + gap / 2) for i in range(n)]
             return idxs
 
-        if len(frames) > self.num_output_frames:
+        if len(frames) >= self.num_output_frames:
             frame_idx = uniform_sample(len(frames), self.num_output_frames)
 
         return torch.stack([frames[i] for i in frame_idx]).permute(0, 2, 3, 1)
@@ -102,5 +103,6 @@ class DecodeAndSample(BasePipelineOp):
         """Saves the output to a pickel."""
         # Create output directory if it doesn't exist
         os.makedirs("outputs", exist_ok=True)
-        torch.save(object, "outputs/decoder_output.pkl")
-        logger.info(f"decoder output saved to decoder_output.pkl")
+        # torch.save(object, "outputs/decoder_output.pkl")
+        np.save("outputs/decoder_output.npy", object.cpu().numpy())
+        logger.info(f"decoder output saved to decoder_output.npy")
