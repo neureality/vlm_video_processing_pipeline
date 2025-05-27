@@ -1,14 +1,3 @@
-# Vectorized rewrite of EnsemblePreprocessing
-# Author: ChatGPT – generated on request of Oded (patch 2)
-# -----------------------------------------------------------------------------
-# Key fix: the previous version concatenated slice images of different spatial
-# sizes (336×602 vs 476×420) before passing them through `torch.nn.functional.
-# unfold`, which requires a uniform H×W across the batch.  The code below keeps
-# **two separate groups** (global‑resized frames and crop patches), runs the
-# patch‑extraction on each group independently, then concatenates the flattened
-# outputs.  This preserves correctness while remaining fully vectorised.
-# -----------------------------------------------------------------------------
-
 import os
 import torch
 import torch.nn.functional as F
