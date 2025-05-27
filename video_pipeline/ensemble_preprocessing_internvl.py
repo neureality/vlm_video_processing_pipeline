@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 from torchvision.transforms.functional import normalize
 import torchcodec
-from typing import List, Tuple
 
 try:
     import nvtx
@@ -103,24 +102,27 @@ class EnsemblePreprocessing:
         device = self.device
         mean = self.mean.to(device)[:, None, None]
         std = self.std.to(device)[:, None, None]
+
         # ---------- GLOBAL ---------------------------------------------------
-        frames = hwcu8.to(device).permute(
-            0, 3, 1, 2).float() / 255.0  # (N,C,H,W)
+        # Normalise the frames [10, 1080, 1920, 3]
+        frames = normalize(hwcu8.permute(0, 3, 1, 2).float(
+        ) / 255.0, mean=mean, std=std)  # [10, 3, 1080, 1920]
         global_rs = F.interpolate(
-            frames, size=self.resize_global, mode="bicubic", align_corners=False)
+            frames, size=self.resize_global, mode="bicubic", align_corners=False)  # [10, 3, 448, 448]
 
         # ---------- CROPS -----------------------------------------------------
         refine = F.interpolate(
-            frames, size=self.resize_refine, mode="bicubic", align_corners=False)
-        crops = torch.chunk(refine, self.grid_cols,
-                            dim=3)      # two (N,C,Hc,Wc)
-        crops_batched = torch.cat(crops, dim=0)                 # (2N,C,Hc,Wc)
+            frames, size=self.resize_refine, mode="bicubic", align_corners=False)  # [10, 3, 448, 896]
+        crops = torch.chunk(refine, self.grid_cols, dim=3) # 2 X [10, 3, 448, 448]
+        crops_batched = torch.cat(crops, dim=0) # (20,3,448,448)
 
         # ---------- CONCAT ----------------------------------------------------
-        crops_grouped = crops_batched.view(10, 2, 3, 448, 448)  # [10, 2, 3, 448, 448]
-        global_expanded = global_rs.unsqueeze(1)                # [10, 1, 3, 448, 448]
-        pixel_values = torch.cat([global_expanded, crops_grouped], dim=1).view(30, 3, 448, 448)
-        
+        crops_grouped = crops_batched.view(
+            10, 2, 3, 448, 448)  # [10, 2, 3, 448, 448]
+        global_expanded = global_rs.unsqueeze(1)  # [10, 1, 3, 448, 448]
+        pixel_values = torch.cat(
+            [global_expanded, crops_grouped], dim=1).view(30, 3, 448, 448)
+
         if pixel_values.size(0) != self.batch_size:
             raise RuntimeError("Unexpected batch size after concatenation")
 
@@ -137,6 +139,6 @@ if __name__ == "__main__":
                                                    )
     pixel_values = ensemble_preprocessing.process()
     print(f"Processed frames shape: {pixel_values.shape}")
-    
-    # torch.save(pixel_values, os.path.join(
-    #     "/home/odedh/nr_value_prop", "_test_all_pixel_values.pt"))
+
+    torch.save(pixel_values, os.path.join(
+        "/home/odedh/nr_value_prop", "_test_all_pixel_values.pt"))
