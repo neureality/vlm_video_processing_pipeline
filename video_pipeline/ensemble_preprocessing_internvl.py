@@ -28,12 +28,14 @@ class EnsemblePreprocessing:
         do_video_decoding: bool = False,
         do_preprocessing: bool = False,
         num_video_decoder_threads: int = 1,
+        num_crops: int = 3,
     ) -> None:
         self.input_video_path = input_video_path
         self.device = device
         self.do_video_decoding = do_video_decoding
         self.do_preprocessing = do_preprocessing
         self.num_video_decoder_threads = num_video_decoder_threads
+        self.num_crops = num_crops
 
         # hyper‑params --------------------------------------------------------
         self.num_output_frames = 10
@@ -42,9 +44,8 @@ class EnsemblePreprocessing:
         self.grid_cols = 2                       # crop_best_grid = [1,2]
         self.mean = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32)
         self.std = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32)
-        self.batch_size = 30                     # 10 global + 20 crops
+        self.batch_size = 30 if self.num_crops == 3 else 10
 
-    @nvtx.annotate("process", color="blue")
     @torch.no_grad()
     def process(self, in_decoded_frames: torch.Tensor | None = None) -> torch.Tensor:
         if self.do_video_decoding:
@@ -97,7 +98,7 @@ class EnsemblePreprocessing:
         return out
 
     # --------------------------- preprocessing -------------------------------
-    @nvtx.annotate("_preprocess_vectorised", color="blue")
+    @nvtx.annotate("preprocess", color="gray")
     def _preprocess_vectorised(self, hwcu8: torch.Tensor) -> torch.Tensor:
         device = self.device
         mean = self.mean.to(device)[:, None, None]
@@ -110,19 +111,23 @@ class EnsemblePreprocessing:
         global_rs = F.interpolate(
             frames, size=self.resize_global, mode="bicubic", align_corners=False)  # [10, 3, 448, 448]
 
-        # ---------- CROPS -----------------------------------------------------
-        refine = F.interpolate(
-            frames, size=self.resize_refine, mode="bicubic", align_corners=False)  # [10, 3, 448, 896]
-        crops = torch.chunk(refine, self.grid_cols, dim=3) # 2 X [10, 3, 448, 448]
-        crops_batched = torch.cat(crops, dim=0) # (20,3,448,448)
+        if self.num_crops == 3: # [30, 3, 448, 448]
+            # ---------- CROPS -----------------------------------------------------
+            refine = F.interpolate(
+                frames, size=self.resize_refine, mode="bicubic", align_corners=False)  # [10, 3, 448, 896]
+            crops = torch.chunk(refine, self.grid_cols, dim=3) # 2 X [10, 3, 448, 448]
+            crops_batched = torch.cat(crops, dim=0) # (20,3,448,448)
 
-        # ---------- CONCAT ----------------------------------------------------
-        crops_grouped = crops_batched.view(
-            10, 2, 3, 448, 448)  # [10, 2, 3, 448, 448]
-        global_expanded = global_rs.unsqueeze(1)  # [10, 1, 3, 448, 448]
-        pixel_values = torch.cat(
-            [global_expanded, crops_grouped], dim=1).view(30, 3, 448, 448)
+            # ---------- CONCAT ----------------------------------------------------
+            crops_grouped = crops_batched.view(
+                10, 2, 3, 448, 448)  # [10, 2, 3, 448, 448]
+            global_expanded = global_rs.unsqueeze(1)  # [10, 1, 3, 448, 448]
+            pixel_values = torch.cat(
+                [global_expanded, crops_grouped], dim=1).view(30, 3, 448, 448)
 
+        else: # [10, 3, 448, 448]
+            pixel_values = global_rs
+            
         if pixel_values.size(0) != self.batch_size:
             raise RuntimeError("Unexpected batch size after concatenation")
 
@@ -135,7 +140,8 @@ if __name__ == "__main__":
     ensemble_preprocessing = EnsemblePreprocessing(input_video_path=video_path,
                                                    device="cpu",
                                                    do_video_decoding=True,
-                                                   do_preprocessing=True
+                                                   do_preprocessing=True,
+                                                   num_crops=1,
                                                    )
     pixel_values = ensemble_preprocessing.process()
     print(f"Processed frames shape: {pixel_values.shape}")
